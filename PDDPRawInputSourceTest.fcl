@@ -1,0 +1,35 @@
+process_name: PDDPRawInputSourceTest
+
+services:
+{
+   PDDPChannelMappings:
+   {
+     service_provider: PDDPChannelMap
+     MapName: "pddp2crp"
+   }
+}
+
+source:
+{
+  module_type: PDDPRawInput
+  maxEvents: -1
+  fileNames: [ "/eos/experiment/neutplatform/protodune/rawdata/np02/rawdata/1088/1088_5_b.cosmics" ]
+  InvertBaseline: 140
+}
+
+outputs:
+{
+  out1:
+  {
+    module_type: 	RootOutput
+    fileName: 	 	"%ifb_pddprawdata.root"
+    compressionLevel: 	1
+    dataTier: 		"raw"
+  }
+}
+
+physics:
+{
+  output: 	[ out1 ]
+  end_paths: 	[ output ]
+}
