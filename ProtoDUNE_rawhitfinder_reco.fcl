@@ -1,0 +1,178 @@
+#include "services_dune.fcl"
+#include "caldata_dune.fcl"
+
+#include "anarootparser.fcl"
+
+#include "tools_dune.fcl"
+
+process_name: Reco
+
+services:
+{
+
+  TFileService: { fileName: "hist.root" }
+  TimeTracker:       {}
+  MemoryTracker:     {}
+  RandomNumberGenerator: {} #ART native random number generator
+  message:              @local::dune_message_services_prod_debug
+  FileCatalogMetadata:  @local::art_file_catalog_mc
+                        @table::dunefddphase_reco_services
+}
+
+services.Geometry: @local::protodunedphase_geo
+services.DetectorPropertiesService: @local::protodunedphase_detproperties
+services.RawDigitPrepService.DoDeconvolution: false
+
+source:
+{
+  module_type: RootInput
+  maxEvents: -1
+  fileNames: ["detsim.root"]
+}
+
+physics:
+
+{
+ producers:
+ {
+  rns:                 { module_type: RandomNumberSaver }
+  caldata:            @local::producer_adcprep
+  dprawhit:           @local::dunefddphase_dprawhitfinder
+ }
+
+  reco: [ rns, caldata, dprawhit ]
+
+	analyzers:
+	{
+    analysistree:      @local::data_3x1x1_anarootparser
+	}
+
+ ana:  [ analysistree ]
+ stream1:  [ out1 ]
+
+ trigger_paths: [reco]
+ end_paths:     [ana, stream1]
+
+}
+
+
+outputs:
+{
+ out1:
+ {
+   module_type: RootOutput
+   fileName:    "%ifb_reco.root"
+   dataTier:    "full-reconstructed"
+   compressionLevel: 1
+ }
+}
+
+################################################################################
+## Data preparation, pedestal and noise removal, ROI definition
+################################################################################
+
+services.RawDigitPrepService.DoNoiseRemoval: 		false
+services.RawDigitPrepService.DoDeconvolution: 		false
+services.RawDigitPrepService.DoEarlySignalFinding: 	false
+services.RawDigitPrepService.DoMitigation: 		false
+services.RawDigitPrepService.SkipBad: 			false
+services.RawDigitPrepService.SkipNoisy: 		false
+services.RawDigitPrepService.DoROI: 			true
+services.RawDigitPrepService.LogLevel: 0
+
+services.RawDigitExtractService.ROIBuilderTool: adcDPhase3x1x1LocalRoiBuilder
+
+services.RawDigitExtractService.PedestalOption: 3   #1: pedestal saved in rawDigit, 2: pedestal set during detsim, 3: either mean or median (see next line)
+services.PedestalEvaluationService: @local::adcped_mean #adcped_median for median, adcped_mean for mean
+services.PedestalEvaluationService.SkipSignals: true
+
+### !!! Use this table for data (eg run 840) !!!
+tools.adcDPhase3x1x1LocalRoiBuilder: {
+  tool_type: AdcDPhase3x1x1LocalRoiBuilder
+  LogLevel: 			1
+  BinsToAverageForPedestal: 	100
+  BinsToSkip: 			2
+  UseStandardDeviation: 	false
+  NConsecBinsAboveThreshold1: 	9
+  NSigmaStart1: 		0.9
+  NSigmaEnd1: 			0.0
+  NConsecBinsAboveThreshold2: 	4
+  NSigmaStart2: 		1.9
+  NSigmaMax: 			5
+  PadLow: 			10
+  PadHigh: 			30
+}
+
+physics.producers.caldata.LogLevel: 0
+physics.producers.caldata.DoGroups: false
+physics.producers.caldata.LogLevel: 100
+
+services.AdcRoiBuildingService.NSigmaStart: 	  -50000  # only pulses with ADC >= NSigmaStart*8 are considered for hit finding. Should correspond to MinSig.
+services.AdcRoiBuildingService.NSigmaEnd:  	  -5000	# only pulses with ADC >= NSigmaStart*8 are considered for hit finding. Should correspond to MinSig.
+
+################################################################################
+## Hit finder
+################################################################################
+
+physics.producers.dprawhit.LogLevel:       	  	1    	# Log level
+physics.producers.dprawhit.NumBinsToAverage:     	0	# 0 or 1 = no averaging.
+physics.producers.dprawhit.ChargeNorm: 			1	# Normalization for fit integral. Should be set to 1.
+physics.producers.dprawhit.WidthNormalization:    	2.335 	# standard width of the fitted hit is the FWHM of the fitted function (full width at half maximum).
+								# This width is divied by 'WidthNormalization' and saved to the recob::Hit.
+								# standard value is chosen to be 2.335 = 2*sqrt(2*ln(2)), which is the relation between FWHM and standard deviation for the Gaussian distribution.
+
+#finding peaks
+physics.producers.dprawhit.MinSig:            		5.0   	# peak threshold for peak finding (in ADC). Peaks with lower amplitudes are neither fitted nor stored.
+physics.producers.dprawhit.TicksToStopPeakFinder: 	10    	# when walking along waveform to find start and end points of a peak, stop when current tick is followed by minimum "TicksToStopPeakFinder" ticks
+								# with equal or higher ADC counts (=inflection point). Stop anyway if ADC count of a tick is <= 0.
+#grouping peaks
+physics.producers.dprawhit.GroupMaxDistance:      	50    	# maximum distance (in ticks) between two peaks to be grouped.
+physics.producers.dprawhit.GroupMinADC:       		-10     # minimum ADC count between two peaks to be grouped.
+
+#merging peaks
+physics.producers.dprawhit.DoMergePeaks:      		true 	# true: merge two peaks of the same group into one before fitting
+physics.producers.dprawhit.MergeADCSumThreshold:  	0.3   	# merge two peaks if (ADC sum of the smaller peak) < MergeADCSumThreshold*(ADC sum of the bigger peak) AND
+physics.producers.dprawhit.MergeMaxADCThreshold:  	0.8   	# merge two peaks if (height of the smaller peak) < MergeMaxADCThreshold*(height of the bigger peak) OR
+# OLD! physics.producers.dprawhit.MinRelativePeakHeight:	0.3	# merge two peaks if (relative peak height of the smaller peak) < MinRelativePeakHeight*(peak height of the smaller peak)
+physics.producers.dprawhit.MinRelativePeakHeightLeft:		0.3	# merge two peaks if (relative peak height of the smaller peak if this peak is at the left) < MinRelativePeakHeight*(peak height of the smaller peak)
+physics.producers.dprawhit.MinRelativePeakHeightRight:		0.3	# merge two peaks if (relative peak height of the smaller peak if this peak is at the right) < MinRelativePeakHeight*(peak height of the smaller peak)
+physics.producers.dprawhit.MergeMaxADCLimit:			5000	# merge two peaks only if smaller peak <= MergeMaxADCLimit (turning off for now (=always true) since new)
+
+
+#filterings grouped and merged peaks
+physics.producers.dprawhit.MinADCSum:             	0.0  	# threshold for ADC sum (in ADC*ticks). Groups of peaks with smaller values are neither fitted nor stored.
+physics.producers.dprawhit.MinWidth:          		15     	# threshold for width (in ticks). Groups of peaks with smaller values are neither fitted nor stored.
+physics.producers.dprawhit.MinADCSumOverWidth:    	0.0   	# threshold for ADC sum over width (in ADC*ticks/ticks). Groups of peaks with smaller values are neither fitted nor stored.
+
+#splitting up long groups of peaks and calculate hit paramter directly from waveform (no fit).
+physics.producers.dprawhit.MaxMultiHit:       		6     	# maximum number of peaks in a group for the group to be fitted. If more, split the group in equally spaced hits without fitting.
+								# When refitting, maximum number of peaks in group can be up to 3x number of peaks before re-fitting.
+physics.producers.dprawhit.MaxFluctuations:		1667	# If the sum of fluctuations in all peaks is > MaxFluctuations, split the group in equally spaced hits without fitting.
+physics.producers.dprawhit.MaxGroupLength:          	1667	# Maximum length of group of peaks for the group to be fitted, in ticks. If more, split the group in equally spaced hits without fitting.
+
+physics.producers.dprawhit.LongPulseWidth:       	40      # max widths for hits in long pulse trains
+physics.producers.dprawhit.LongMaxHits:         	20      # max number hits in long pulse trains
+
+#fitting groups of peaks
+physics.producers.dprawhit.SameShape:			true	# if true: fits within same group are forced to have identical shape
+physics.producers.dprawhit.MinTau:        		0.01  	# minimum value of the rising and falling time constants of the fit, in microseconds.
+physics.producers.dprawhit.MaxTau:        		20    	# maximum value of the rising and falling time constants of the fit, in microseconds.
+physics.producers.dprawhit.FitPeakMeanRange:      	5     	# range in that the fitter can move the mean of the fit function w.r.t. the peak.
+
+#refitting fitted groups of peaks peaks
+physics.producers.dprawhit.TryNplus1Fits:         	false 	# true: will try to re-fit poorly modeled groups of peaks (chi2PerNDF>Chi2NDFRetry) while adding (an) additional peak(s).
+physics.producers.dprawhit.Chi2NDFRetry:     		100   	# for single peaks: if the first fit returns a Chi2/NDF greater than this, try to re-fit.
+physics.producers.dprawhit.Chi2NDFRetryFactorMultiHits: 2	# for groups of peaks (2 or more): if the first fit returns a Chi2/NDF greater than Chi2NDFRetryFactorMultiHits*Chi2NDFRetry, try to re-fit.
+
+#filtering (re)fitted groups of peaks. groups of peaks with a higher chi2/ndf are split up.
+physics.producers.dprawhit.Chi2NDFMax:              	2000  	# for single peaks: maximum chi square / NDF allowed for a fit to be stored as recob::Hits. Otherwise, handle peak as long pulse train.
+physics.producers.dprawhit.Chi2NDFMaxFactorMultiHits: 	2	# for groups of peaks (2 or more): maximum chi square / NDF allowed for a fit to be stored as recob::Hit. Otherwise, handle group as long pulse train.
+
+
+################################################################################
+## Data dumper (anarootparser)
+################################################################################
+
+physics.analyzers.analysistree.LogLevel:		0
+physics.analyzers.analysistree.SaveRawDigitInfo:	true
+physics.analyzers.analysistree.SaveRecobWireInfo:	true
