@@ -1,0 +1,55 @@
+#include "evd_dune.fcl"
+process_name: EVD
+
+services.RecoDrawingOptions.HitDrawer:
+{
+  tool_type:       DrawSkewHits
+}
+services.Geometry: @local::protodunedphase_geo
+
+services.RawDrawingOptions.TotalTicks: 10000
+services.DetectorPropertiesService.Efield:	[0.5, 4.0, 0.0]
+services.DetectorClocksService.ClockSpeedTPC: 2.5
+services.DetectorPropertiesService.NumberTimeSamples: 10000
+services.DetectorPropertiesService.ReadOutWindowSize: 10000
+
+services.RecoDrawingOptions.WireModuleLabels: ["caldata"]
+services.RecoDrawingOptions.HitModuleLabels: ["dprawhit"]
+#services.RecoDrawingOptions.ClusterModuleLabels: ["linecluster"]
+#services.RecoDrawingOptions.TrackModuleLabels: ["pmtrack"]
+#services.RecoDrawingOptions.VertexModuleLabels: ["pmtrack"]
+
+services.DetPedestalService: @local::dunedp_fixedpeds
+services.DetPedestalService.FixedDetPedestal.PedMeanY: 0
+services.DetPedestalService.FixedDetPedestal.PedMeanZ: 0
+
+services.RecoDrawingOptions.Draw2DEndPoints: 0
+services.RecoDrawingOptions.Draw2DSlopeEndPoints: 0
+services.RecoDrawingOptions.Draw3DEdges: true
+services.RecoDrawingOptions.Draw3DPCAAxes: true
+services.RecoDrawingOptions.Draw3DSpacePointHeatMap: false
+services.RecoDrawingOptions.Draw3DSpacePoints: false
+services.RecoDrawingOptions.DrawAllWireIDs: false
+services.RecoDrawingOptions.DrawBestPCAAxisOnly: false
+services.RecoDrawingOptions.DrawBezierTracks: 0
+services.RecoDrawingOptions.DrawClusters: 0
+services.RecoDrawingOptions.DrawCosmicTags: 0
+services.RecoDrawingOptions.DrawEdges: 0
+services.RecoDrawingOptions.DrawEvents: 0
+services.RecoDrawingOptions.DrawHits: 0
+services.RecoDrawingOptions.DrawOpFlashes: 0
+services.RecoDrawingOptions.DrawOpHits: 0
+services.RecoDrawingOptions.DrawPFParticles: 0
+services.RecoDrawingOptions.DrawProngs: 0
+services.RecoDrawingOptions.DrawSeeds: 0
+services.RecoDrawingOptions.DrawShowers: 0
+services.RecoDrawingOptions.DrawSkeleton3DHitsOnly: false
+services.RecoDrawingOptions.DrawSliceSpacePoints: 0
+services.RecoDrawingOptions.DrawSlices: 0
+services.RecoDrawingOptions.DrawSpacePoints: 0
+services.RecoDrawingOptions.DrawTrackSegments: 0
+services.RecoDrawingOptions.DrawTrackSpacePoints: 0
+services.RecoDrawingOptions.DrawTrackTrajectoryPoints: 0
+services.RecoDrawingOptions.DrawTrackVertexAssns: false
+services.RecoDrawingOptions.DrawTracks: 0
+services.RecoDrawingOptions.DrawVertices: 0
